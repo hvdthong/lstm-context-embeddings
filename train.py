@@ -47,7 +47,7 @@ x_text, y, seqlen = data_helpers.load_data_and_labels()
 
 # Build vocabulary
 max_document_length = max(seqlen)
-vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length) 
+vocab_processor = learn.preprocessing.VocabularyProcessor(max_document_length)
 x = np.array(list(vocab_processor.fit_transform(x_text)))
 
 # Randomly shuffle data
@@ -71,10 +71,10 @@ print("Train/Dev split: {:d}/{:d}".format(len(y_train), len(y_dev)))
 
 with tf.Graph().as_default():
     session_conf = tf.ConfigProto(
-        allow_soft_placement=FLAGS.allow_soft_placement, 
+        allow_soft_placement=FLAGS.allow_soft_placement,
         log_device_placement=FLAGS.log_device_placement)
     sess = tf.Session(config=session_conf)
-    
+
     with sess.as_default():
         model = Model(
             sequence_length=x_train.shape[1],
@@ -96,11 +96,11 @@ with tf.Graph().as_default():
         grad_summaries = []
         for g, v in grads_and_vars:
             if g is not None:
-                grad_hist_summary = tf.histogram_summary("{}/grad/hist".format(v.name), g)
-                sparsity_summary = tf.scalar_summary("{}/grad/sparsity".format(v.name), tf.nn.zero_fraction(g))
+                grad_hist_summary = tf.summary.histogram("{}/grad/hist".format(v.name), g)
+                sparsity_summary = tf.summary.histogram("{}/grad/sparsity".format(v.name), tf.nn.zero_fraction(g))
                 grad_summaries.append(grad_hist_summary)
                 grad_summaries.append(sparsity_summary)
-        grad_summaries_merged = tf.merge_summary(grad_summaries)
+        grad_summaries_merged = tf.summary.merge(grad_summaries)
 
         # Output directory for models and summaries
         timestamp = str(int(time.time()))
@@ -108,18 +108,18 @@ with tf.Graph().as_default():
         print("Writing to {}\n".format(out_dir))
 
         # Summaries for loss and accuracy
-        loss_summary = tf.scalar_summary("loss", model.loss)
-        acc_summary = tf.scalar_summary("accuracy", model.accuracy)
+        loss_summary = tf.summary.scalar("loss", model.loss)
+        acc_summary = tf.summary.scalar("accuracy", model.accuracy)
 
         # Train Summaries
-        train_summary_op = tf.merge_summary([loss_summary, acc_summary, grad_summaries_merged])
+        train_summary_op = tf.summary.merge([loss_summary, acc_summary, grad_summaries_merged])
         train_summary_dir = os.path.join(out_dir, "summaries", "train")
-        train_summary_writer = tf.train.SummaryWriter(train_summary_dir, sess.graph)
+        train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
 
         # Dev summaries
-        dev_summary_op = tf.merge_summary([loss_summary, acc_summary])
+        dev_summary_op = tf.summary.merge([loss_summary, acc_summary])
         dev_summary_dir = os.path.join(out_dir, "summaries", "dev")
-        dev_summary_writer = tf.train.SummaryWriter(dev_summary_dir, sess.graph)
+        dev_summary_writer = tf.summary.FileWriter(dev_summary_dir, sess.graph)
 
         # Checkpoint directory. Tensorflow assumes this directory already exists so we need to create it
         checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
@@ -136,14 +136,14 @@ with tf.Graph().as_default():
 
         if FLAGS.word2vec:
             # Initialize matrix with random uniform distribution
-            initW = np.random.uniform(-0.25,0.25,(len(vocab_processor.vocabulary_), FLAGS.embedding_dim))
+            initW = np.random.uniform(-0.25, 0.25, (len(vocab_processor.vocabulary_), FLAGS.embedding_dim))
             # Load any vectors from word2vec
             print("Load word2vec file {}\n".format(FLAGS.word2vec))
             with open(FLAGS.word2vec, "rb") as f:
                 header = f.readline()
                 vocab_size, layer1_size = map(int, header.split())
                 binary_len = np.dtype('float32').itemsize * layer1_size
-                
+
                 for line in range(vocab_size):
                     word = []
                     while True:
@@ -152,25 +152,26 @@ with tf.Graph().as_default():
                             word = ''.join(word)
                             break
                         if ch != '\n':
-                            word.append(ch)   
-                    
+                            word.append(ch)
+
                     idx = vocab_processor.vocabulary_.get(word)
                     if idx != 0:
-                        initW[idx] = np.fromstring(f.read(binary_len), dtype='float32')  
+                        initW[idx] = np.fromstring(f.read(binary_len), dtype='float32')
                     else:
                         f.read(binary_len)
 
             sess.run(model.W.assign(initW))
+
 
         def train_step(x_batch, seqlen_batch, y_batch):
             """
             A single training step
             """
             feed_dict = {
-              model.input_x: x_batch,
-              model.seqlen: seqlen_batch,
-              model.input_y: y_batch,
-              model.dropout_keep_prob: FLAGS.dropout_keep_prob
+                model.input_x: x_batch,
+                model.seqlen: seqlen_batch,
+                model.input_y: y_batch,
+                model.dropout_keep_prob: FLAGS.dropout_keep_prob
             }
             _, step, summaries, loss, accuracy = sess.run(
                 [train_op, global_step, train_summary_op, model.loss, model.accuracy],
@@ -180,40 +181,42 @@ with tf.Graph().as_default():
             print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
             train_summary_writer.add_summary(summaries, step)
 
+
         def dev_step(x_batch, seqlen_batch, y_batch, writer=None):
             """
             Evaluates model on a dev set
             """
             feed_dict = {
-              model.input_x: x_batch,
-              model.seqlen: seqlen_batch,
-              model.input_y: y_batch,
-              model.dropout_keep_prob: 1.0
+                model.input_x: x_batch,
+                model.seqlen: seqlen_batch,
+                model.input_y: y_batch,
+                model.dropout_keep_prob: 1.0
             }
             step, summaries, loss, accuracy = sess.run(
                 [global_step, dev_summary_op, model.loss, model.accuracy],
                 feed_dict)
-            
+
             time_str = datetime.datetime.now().isoformat()
             print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
             if writer:
                 writer.add_summary(summaries, step)
 
+
         # Generate batches
         batches = data_helpers.batch_iter(
             list(zip(x_train, y_train)), seqlen_train, FLAGS.batch_size, FLAGS.num_epochs)
-        
+
         # Training loop. For each batch...
         for batch, seqlen_batch in batches:
             x_batch, y_batch = zip(*batch)
             train_step(x_batch, seqlen_batch, y_batch)
             current_step = tf.train.global_step(sess, global_step)
-            
+
             if current_step % FLAGS.evaluate_every == 0:
                 print("\nEvaluation:")
                 dev_step(x_dev, seqlen_dev, y_dev, writer=dev_summary_writer)
                 print("")
-            
+
             if current_step % FLAGS.checkpoint_every == 0:
                 path = saver.save(sess, checkpoint_prefix, global_step=current_step)
                 print("Saved model checkpoint to {}\n".format(path))
