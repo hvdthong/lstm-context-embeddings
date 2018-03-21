@@ -66,6 +66,7 @@ def batch_iter(data, seqlen_data, batch_size, num_epochs, shuffle=True):
         if shuffle:
             shuffle_indices = np.random.permutation(np.arange(data_size))
             shuffled_data = data[shuffle_indices]
+            # seqlen_data = seqlen_data[shuffle_indices]
         else:
             shuffled_data = data
         
