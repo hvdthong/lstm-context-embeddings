@@ -49,24 +49,24 @@ class Model(object):
             # lstm_outputs_fw, lstm_outputs_bw = tf.split(value=self.lstm_outputs, split_dim=2, num_split=2)
             # self.lstm_outputs = tf.add(lstm_outputs_fw, lstm_outputs_bw, name="lstm_outputs")
 
-            with tf.variable_scope("lstm-output-fw"):
-                self.lstm_outputs_fw, _ = tf.nn.dynamic_rnn(
-                    lstm_fw_cell, 
-                    self.embedded_chars, 
-                    sequence_length=self.seqlen, 
-                    dtype=tf.float32)
+        with tf.variable_scope("lstm-output-fw"):
+            self.lstm_outputs_fw, _ = tf.nn.dynamic_rnn(
+                lstm_fw_cell,
+                self.embedded_chars,
+                sequence_length=self.seqlen,
+                dtype=tf.float32)
 
-            with tf.variable_scope("lstm-output-bw"):
-                self.embedded_chars_rev = array_ops.reverse_sequence(self.embedded_chars, seq_lengths=self.seqlen, seq_dim=1)
-                tmp, _ = tf.nn.dynamic_rnn(
-                    lstm_bw_cell, 
-                    self.embedded_chars_rev, 
-                    sequence_length=self.seqlen, 
-                    dtype=tf.float32)
-                self.lstm_outputs_bw = array_ops.reverse_sequence(tmp, seq_lengths=self.seqlen, seq_dim=1)
+        with tf.variable_scope("lstm-output-bw"):
+            self.embedded_chars_rev = array_ops.reverse_sequence(self.embedded_chars, seq_lengths=self.seqlen, seq_dim=1)
+            tmp, _ = tf.nn.dynamic_rnn(
+                lstm_bw_cell,
+                self.embedded_chars_rev,
+                sequence_length=self.seqlen,
+                dtype=tf.float32)
+            self.lstm_outputs_bw = array_ops.reverse_sequence(tmp, seq_lengths=self.seqlen, seq_dim=1)
 
-            # Concatenate outputs
-            self.lstm_outputs = tf.add(self.lstm_outputs_fw, self.lstm_outputs_bw, name="lstm_outputs")
+        # Concatenate outputs
+        self.lstm_outputs = tf.add(self.lstm_outputs_fw, self.lstm_outputs_bw, name="lstm_outputs")
             
         self.lstm_outputs_expanded = tf.expand_dims(self.lstm_outputs, -1)
 
